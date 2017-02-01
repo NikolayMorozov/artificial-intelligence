@@ -8,6 +8,15 @@ relative strength using tournament.py and include the results in your report.
 """
 import random
 
+# for test purpose only!!!!
+import isolation
+
+import agent_test
+import operator
+import time
+
+
+
 
 class Timeout(Exception):
     """Subclass base exception for code clarity."""
@@ -32,10 +41,23 @@ def custom_score(game, player):
     ----------
     float
         The heuristic value of the current game state to the specified player.
-    """
+    """    
+    oponent = game.get_opponent(player)
+    blank_spaces = game.get_blank_spaces() 
+    playerMoves  = game.get_legal_moves(player)
+    oponentMoves = game.get_legal_moves(oponent)
+         
+    return float(len(blank_spaces)+len(playerMoves)-len(oponentMoves))
 
-    # TODO: finish this function!
-    raise NotImplementedError
+class searchNode:
+    def __init__(self, game, parent, move, lvl):
+        
+        self.state = game
+        self.parentState = parent
+        self.movedTo = move
+        self.searchLevel = lvl
+
+
 
 
 class CustomPlayer:
@@ -77,6 +99,8 @@ class CustomPlayer:
         self.time_left = None
         self.TIMER_THRESHOLD = timeout
 
+
+
     def get_move(self, game, legal_moves, time_left):
         """Search for the best move from the available legal moves and return a
         result before the time limit expires.
@@ -112,27 +136,65 @@ class CustomPlayer:
             Board coordinates corresponding to a legal move; may return
             (-1, -1) if there are no available legal moves.
         """
-
         self.time_left = time_left
+        
+        startTime = time.time()
+        iterativeDeepening = dict()
+       
+
+        
+        
+        
+        self.time_left = time_left
+        
+        startTime = time.time()
+        max_search_depth = self.search_depth 
+        
+        
+#        print('iterative', self.iterative)
+#        print('method', self.method)
 
         # TODO: finish this function!
 
         # Perform any required initializations, including selecting an initial
         # move from the game board (i.e., an opening book), or returning
         # immediately if there are no legal moves
-
+        
         try:
+        
             # The search method call (alpha beta or minimax) should happen in
             # here in order to avoid timeout. The try/except block will
             # automatically catch the exception raised by the search method
             # when the timer gets close to expiring
-            pass
+            # pass
+#            print('SI', self.iterative)
+            bestValue = None
+#            if self.iterative == True:
+            if True:
+                flag = True
+                depth = 1
+                while flag:
+#                    print(depth)
+                    s, m = self.minimax(game, depth, True)
+                    iterativeDeepening[m] = s
+
+                    bestValue = max(iterativeDeepening.items(), key=operator.itemgetter(1))[0]
+                    
+                    if (time.time()-startTime) > 0.95:
+#                        print('it is showtime')
+#                        flag = False 
+                        return bestValue
+                    depth +=1
+            else:
+                pass
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
             pass
 
         # Return the best move from the last completed search iteration
+#        return bestMove
+        return bestValue
         raise NotImplementedError
 
     def minimax(self, game, depth, maximizing_player=True):
@@ -162,9 +224,36 @@ class CustomPlayer:
         """
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
+        
+        node_terminal = False
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        if (depth == 0)  or node_terminal:
+            s,m = self.score(game, self), game.get_player_location(self)             
+            return s, m             
+
+        if maximizing_player: #  maximizing player
+            bestValue = float('-inf')
+            bestMove = None
+            legal_moves = game.get_legal_moves()
+            for move in legal_moves:
+                nextGame = game.forecast_move(move)
+                v, m = self.minimax(nextGame, depth - 1, False)                
+                if (v > bestValue ):
+                    bestMove = move
+                    bestValue = v
+            return float(bestValue), bestMove
+
+        else:  #  minimizing player
+            bestValue = float('inf')
+            bestMove = None
+            legal_moves = game.get_legal_moves()
+            for move in legal_moves:
+                nextGame = game.forecast_move(move)
+                v, m = self.minimax(nextGame, depth - 1, True)
+                if (v < bestValue ):
+                    bestMove = move
+                    bestValue = v
+            return float(bestValue), bestMove
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
         """Implement minimax search with alpha-beta pruning as described in the
@@ -201,5 +290,76 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
+        print('========================')
+        print('d',depth)
+   # check if at search bound
+
+
+        
+#        isTerminal = False
+        if depth == 0:
+            s,m = self.score(game, self), game.get_player_location(self)             
+            return s, m
+        
+        legal_moves = game.get_legal_moves()
+        
+        if len(legal_moves)==0:
+            bestMove = (-1, -1)
+            s,m = self.score(game, self), game.get_player_location(self)
+            return s, bestMove
+            
+
+#        children = successors(node)
+
+        bestMove = (-1,-1)
+
+
+        if maximizing_player:   # maximizer turn
+            legal_moves = game.get_legal_moves()
+            for move in legal_moves:
+                nextGame = game.forecast_move(move)
+                v, m = self.alphabeta(nextGame, depth - 1, alpha=alpha, beta=beta, maximizing_player=False)
+                if v > alpha:
+                    alpha = v
+                    bestMove = move
+                if alpha > beta:
+                    return beta, move
+            return alpha, move
+        else:                   #minimizers turn
+            legal_moves = game.get_legal_moves()
+            for move in legal_moves:
+                nextGame = game.forecast_move(move)
+                v, m = self.alphabeta(nextGame, depth - 1, alpha=alpha, beta=beta, maximizing_player=True)
+                if v < beta:
+                    beta = v
+                if beta < alpha:
+                    return beta, move
+            return beta, move
+
         # TODO: finish this function!
         raise NotImplementedError
+
+if __name__ == '__main__':
+        player1 = "Player1"
+        player2 = "Player2"
+        p1_location = (5, 5)
+        p2_location = (1, 1)  # top left corner
+        game = isolation.Board(player1, player2)
+        game.apply_move(p1_location)
+        game.apply_move(p2_location)
+
+        print('c_score', custom_score(game, player1))
+        
+        at = agent_test.Project1Test()
+
+        
+     #   at.test_heuristic()
+     #   at.test_get_move_interface()
+        
+     #   at.test_minimax_interface()
+     #   at.test_minimax()
+        
+#        at.test_get_move()
+        
+        at.test_alphabeta_interface()
+        at.test_alphabeta()
