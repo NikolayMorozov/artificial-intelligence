@@ -464,6 +464,7 @@ class Project1Test(unittest.TestCase):
 
             # disable search timeout by returning a constant value
             agentUT.time_left = lambda: 1e3
+            
             _, move = agentUT.alphabeta(board, test_depth)
 
             num_explored_valid = board.counts[0] == counts[idx][0]
