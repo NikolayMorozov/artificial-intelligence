@@ -13,7 +13,7 @@ import isolation
 
 import agent_test
 import operator
-import time
+
 
 
 
@@ -42,23 +42,13 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """    
+    # obtaining components for heuristic   
     oponent = game.get_opponent(player)
     blank_spaces = game.get_blank_spaces() 
     playerMoves  = game.get_legal_moves(player)
     oponentMoves = game.get_legal_moves(oponent)
          
     return float(len(blank_spaces)+len(playerMoves)-len(oponentMoves))
-
-class searchNode:
-    def __init__(self, game, parent, move, lvl):
-        
-        self.state = game
-        self.parentState = parent
-        self.movedTo = move
-        self.searchLevel = lvl
-
-
-
 
 class CustomPlayer:
     """Game-playing agent that chooses a move using your evaluation function
@@ -138,62 +128,64 @@ class CustomPlayer:
         """
         self.time_left = time_left
         
-        startTime = time.time()
-        iterativeDeepening = dict()
-       
-
-        
-        
-        
-        self.time_left = time_left
-        
-        startTime = time.time()
-        max_search_depth = self.search_depth 
-        
-        
-#        print('iterative', self.iterative)
-#        print('method', self.method)
-
         # TODO: finish this function!
 
         # Perform any required initializations, including selecting an initial
         # move from the game board (i.e., an opening book), or returning
         # immediately if there are no legal moves
-        
-        try:
-        
+        try:        
             # The search method call (alpha beta or minimax) should happen in
             # here in order to avoid timeout. The try/except block will
             # automatically catch the exception raised by the search method
             # when the timer gets close to expiring
             # pass
-#            print('SI', self.iterative)
+            
+            # initializing variables that control iterative deepening, search algorithm and bestMove
+            isID = self.iterative
+            method = self.method
             bestValue = None
-#            if self.iterative == True:
-            if True:
-                flag = True
+            
+            
+            if isID:   # block corresponding to iterative deepening
+                # dict() to stor alternative solution as final selection method could contribute in to overall efficiency
+                iterativeDeepening = dict()
+                # starting with smalles depth
                 depth = 1
-                while flag:
-#                    print(depth)
-                    s, m = self.minimax(game, depth, True)
-                    iterativeDeepening[m] = s
-
+                # infinte loop until algorithm doesn't run out 
+                while True:
+                    #calling appropriate search method
+                    if  method == 'minimax':
+                        score, move = self.minimax(game, depth, True)
+                    elif method == 'alphabeta':                    
+                        score, move = self.alphabeta(game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True)
+                    
+                    # adding newly received result into dictionary
+                    iterativeDeepening[move] = score
+                    
+                    # getting move simply based best heuristic value. Perhaps,  not the cleverest way... 
                     bestValue = max(iterativeDeepening.items(), key=operator.itemgetter(1))[0]
                     
-                    if (time.time()-startTime) > 0.95:
-#                        print('it is showtime')
-#                        flag = False 
+                    # returning current best option before time is out
+                    if time_left() < 20:
                         return bestValue
+                    
+                    # incrementally increase search depth
                     depth +=1
-            else:
-                pass
+            else: #fixed depth search branch
+                depth = self.search_depth
+                move = (-1, -1)
+                # either minmax or alphabeta search method
+                if method == 'minimax':
+                    _, move = self.minimax(game, depth, True)
+                elif method == 'alphabeta':                    
+                    _, move = self.alphabeta(game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True)
+                return move
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
             pass
 
         # Return the best move from the last completed search iteration
-#        return bestMove
         return bestValue
         raise NotImplementedError
 
@@ -225,9 +217,9 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
         
-        node_terminal = False
 
-        if (depth == 0)  or node_terminal:
+
+        if depth == 0:
             s,m = self.score(game, self), game.get_player_location(self)             
             return s, m             
 
@@ -290,13 +282,6 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        print('========================')
-        print('d',depth)
-   # check if at search bound
-
-
-        
-#        isTerminal = False
         if depth == 0:
             s,m = self.score(game, self), game.get_player_location(self)             
             return s, m
@@ -307,13 +292,8 @@ class CustomPlayer:
             bestMove = (-1, -1)
             s,m = self.score(game, self), game.get_player_location(self)
             return s, bestMove
-            
-
-#        children = successors(node)
 
         bestMove = (-1,-1)
-
-
         if maximizing_player:   # maximizer turn
             legal_moves = game.get_legal_moves()
             for move in legal_moves:
@@ -322,9 +302,9 @@ class CustomPlayer:
                 if v > alpha:
                     alpha = v
                     bestMove = move
-                if alpha > beta:
-                    return beta, move
-            return alpha, move
+                if alpha >= beta:
+                    return beta, bestMove
+            return alpha, bestMove
         else:                   #minimizers turn
             legal_moves = game.get_legal_moves()
             for move in legal_moves:
@@ -332,34 +312,11 @@ class CustomPlayer:
                 v, m = self.alphabeta(nextGame, depth - 1, alpha=alpha, beta=beta, maximizing_player=True)
                 if v < beta:
                     beta = v
-                if beta < alpha:
-                    return beta, move
-            return beta, move
+                    bestMove = move
+                if beta <= alpha:
+                    return beta, bestMove
+            return beta, bestMove
 
         # TODO: finish this function!
         raise NotImplementedError
 
-if __name__ == '__main__':
-        player1 = "Player1"
-        player2 = "Player2"
-        p1_location = (5, 5)
-        p2_location = (1, 1)  # top left corner
-        game = isolation.Board(player1, player2)
-        game.apply_move(p1_location)
-        game.apply_move(p2_location)
-
-        print('c_score', custom_score(game, player1))
-        
-        at = agent_test.Project1Test()
-
-        
-     #   at.test_heuristic()
-     #   at.test_get_move_interface()
-        
-     #   at.test_minimax_interface()
-     #   at.test_minimax()
-        
-#        at.test_get_move()
-        
-        at.test_alphabeta_interface()
-        at.test_alphabeta()
