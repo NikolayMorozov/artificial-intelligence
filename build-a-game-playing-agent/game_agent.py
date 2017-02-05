@@ -6,22 +6,131 @@ augment the test suite with your own test cases to further test your code.
 You must test your agent's strength against a set of agents with known
 relative strength using tournament.py and include the results in your report.
 """
-import random
 
-# for test purpose only!!!!
-import isolation
-
-import agent_test
 import operator
-
-
-
-
 
 class Timeout(Exception):
     """Subclass base exception for code clarity."""
     pass
 
+def heuristic1(game, player):
+    """Calculate the heuristic value as a difference of number of legal moves available for player and its opponent.
+
+    Parameters
+    ----------
+    game : `isolation.Board`
+        An instance of `isolation.Board` encoding the current state of the
+        game (e.g., player locations and blocked cells).
+
+    player : object
+        A player instance in the current game (i.e., an object corresponding to
+        one of the player objects `game.__player_1__` or `game.__player_2__`.)
+
+    Returns
+    ----------
+    float
+        The heuristic value of the current game state to the specified player.
+    """
+    # getting opponent
+    opponent = game.get_opponent(player)
+    # obtaining locations
+    playerMoves  = game.get_legal_moves(player)
+    opponentMoves = game.get_legal_moves(opponent)
+    
+
+    # returning heuristic
+    return float(len(playerMoves) - len(opponentMoves))
+    
+    
+    
+def heuristic2(game, player):
+    """Calculate the heuristic value as a difference of number of legal moves available for player and its opponent and
+     adding incentive to take central location.
+
+    Parameters
+    ----------
+    game : `isolation.Board`
+        An instance of `isolation.Board` encoding the current state of the
+        game (e.g., player locations and blocked cells).
+
+    player : object
+        A player instance in the current game (i.e., an object corresponding to
+        one of the player objects `game.__player_1__` or `game.__player_2__`.)
+
+    Returns
+    ----------
+    float
+        The heuristic value of the current game state to the specified player.
+    """
+    
+    #Calculating center position of the game board 
+    mid_w , mid_h = game.height // 2 + 1 , game.width // 2 + 1
+    center_location  = (mid_w , mid_h)
+    
+    # getting players location
+    player_location  = game.get_player_location(player)
+    
+    # checking if player is the center location
+    if center_location == player_location:
+        # returning heuristic1 with incentive 
+        return heuristic1(game, player)+100
+    else:
+        # returning heuristic1 
+        return heuristic1(game, player)
+
+def proximity(location1, location2):
+    '''
+    Function return extra score as function of proximity between two positions.
+    
+    Parameters
+    ----------
+    location1, location2: tuple
+        two tuples of integers (i,j) correspond to player location and center positon of the board
+
+    Returns
+    ----------
+    float
+        The heuristic value of 100 for center of the board position and zero otherwise   
+    '''
+    return abs(location1[0]-location2[0])+abs(location1[1]-location2[1])
+
+def heuristic3(game, player):
+    """Calculate the heuristic value of a game state from the point of view
+    of the given player.
+
+    Parameters
+    ----------
+    game : `isolation.Board`
+        An instance of `isolation.Board` encoding the current state of the
+        game (e.g., player locations and blocked cells).
+
+    player : object
+        A player instance in the current game (i.e., an object corresponding to
+        one of the player objects `game.__player_1__` or `game.__player_2__`.)
+
+    Returns
+    ----------
+    float
+        The heuristic value of the current game state to the specified player.
+    """
+    opponent = game.get_opponent(player)
+    player_location  = game.get_player_location(player)
+    opponent_location = game.get_player_location(opponent) 
+    playerMoves  = game.get_legal_moves(player)
+    opponentMoves = game.get_legal_moves(opponent)
+
+    
+    blank_spaces = game.get_blank_spaces()
+    board_size = game.width * game.height
+    
+    localArea = (game.width + game.height)/4
+    
+    if board_size - len(blank_spaces) > float(0.3 * board_size):
+
+        playerMoves = [move for move in playerMoves if proximity(player_location, move)<=localArea]
+        opponentMoves = [move for move in opponentMoves if proximity(opponent_location, move)<=localArea]
+        
+    return float(len(playerMoves) - len(opponentMoves))
 
 def custom_score(game, player):
     """Calculate the heuristic value of a game state from the point of view
@@ -41,14 +150,9 @@ def custom_score(game, player):
     ----------
     float
         The heuristic value of the current game state to the specified player.
-    """    
-    # obtaining components for heuristic   
-    oponent = game.get_opponent(player)
-    blank_spaces = game.get_blank_spaces() 
-    playerMoves  = game.get_legal_moves(player)
-    oponentMoves = game.get_legal_moves(oponent)
-         
-    return float(len(blank_spaces)+len(playerMoves)-len(oponentMoves))
+    """
+             
+    return heuristic3(game, player)
 
 class CustomPlayer:
     """Game-playing agent that chooses a move using your evaluation function
@@ -88,8 +192,6 @@ class CustomPlayer:
         self.method = method
         self.time_left = None
         self.TIMER_THRESHOLD = timeout
-
-
 
     def get_move(self, game, legal_moves, time_left):
         """Search for the best move from the available legal moves and return a
@@ -160,17 +262,24 @@ class CustomPlayer:
                         score, move = self.alphabeta(game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True)
                     
                     # adding newly received result into dictionary
-                    iterativeDeepening[move] = score
-                    
+#                    iterativeDeepening[move] = score
+                    if move in iterativeDeepening:
+                        if score > iterativeDeepening[move]:
+                            iterativeDeepening[move] = score
+                    else:
+                        iterativeDeepening[move] = score
                     # getting move simply based best heuristic value. Perhaps,  not the cleverest way... 
                     bestValue = max(iterativeDeepening.items(), key=operator.itemgetter(1))[0]
                     
                     # returning current best option before time is out
-                    if time_left() < 20:
+
+                    if time_left() < 15:
                         return bestValue
                     
                     # incrementally increase search depth
                     depth +=1
+                print('shit')
+                return bestValue
             else: #fixed depth search branch
                 depth = self.search_depth
                 move = (-1, -1)
@@ -183,9 +292,11 @@ class CustomPlayer:
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
+            return bestValue
             pass
 
         # Return the best move from the last completed search iteration
+        print('hmmm', method, isID )
         return bestValue
         raise NotImplementedError
 
@@ -218,33 +329,40 @@ class CustomPlayer:
             raise Timeout()
         
 
-
-        if depth == 0:
-            s,m = self.score(game, self), game.get_player_location(self)             
-            return s, m             
-
-        if maximizing_player: #  maximizing player
+        # returning score value on depth zero  
+        if depth == 0:             
+            return self.score(game, self), game.get_player_location(self)            
+        #initializing best move
+        bestMove = (-1,-1)
+        if maximizing_player:   #  maximizing player
+            #initializing best value as negative infinity
             bestValue = float('-inf')
-            bestMove = None
+            #obtaining available legal moves
             legal_moves = game.get_legal_moves()
+            #recursively evaluating moves
             for move in legal_moves:
                 nextGame = game.forecast_move(move)
-                v, m = self.minimax(nextGame, depth - 1, False)                
+                v, _ = self.minimax(nextGame, depth - 1, False) 
+                # evaluating newly acquired score               
                 if (v > bestValue ):
                     bestMove = move
                     bestValue = v
+            # return score and move
             return float(bestValue), bestMove
-
-        else:  #  minimizing player
+        else:                   #  minimizing player
+            #initializing best value as negative infinity
             bestValue = float('inf')
-            bestMove = None
+            #obtaining available legal moves
             legal_moves = game.get_legal_moves()
+            #recursively evaluating moves
             for move in legal_moves:
                 nextGame = game.forecast_move(move)
-                v, m = self.minimax(nextGame, depth - 1, True)
+                v, _ = self.minimax(nextGame, depth - 1, True)
+                # evaluating newly acquired score 
                 if (v < bestValue ):
                     bestMove = move
                     bestValue = v
+            # return score and move
             return float(bestValue), bestMove
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
@@ -282,6 +400,7 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
+        # returning score value on depth zero 
         if depth == 0:
             s,m = self.score(game, self), game.get_player_location(self)             
             return s, m
@@ -292,31 +411,35 @@ class CustomPlayer:
             bestMove = (-1, -1)
             s,m = self.score(game, self), game.get_player_location(self)
             return s, bestMove
-
+        
+        #initializing best move
         bestMove = (-1,-1)
+        
         if maximizing_player:   # maximizer turn
+            #obtaining available legal moves
             legal_moves = game.get_legal_moves()
+            #recursively evaluating moves
             for move in legal_moves:
                 nextGame = game.forecast_move(move)
                 v, m = self.alphabeta(nextGame, depth - 1, alpha=alpha, beta=beta, maximizing_player=False)
                 if v > alpha:
                     alpha = v
                     bestMove = move
+                #checking criteria for pruning
                 if alpha >= beta:
                     return beta, bestMove
             return alpha, bestMove
         else:                   #minimizers turn
+            #obtaining available legal moves
             legal_moves = game.get_legal_moves()
+            #recursively evaluating moves
             for move in legal_moves:
                 nextGame = game.forecast_move(move)
                 v, m = self.alphabeta(nextGame, depth - 1, alpha=alpha, beta=beta, maximizing_player=True)
                 if v < beta:
                     beta = v
                     bestMove = move
+                #checking criteria for pruning
                 if beta <= alpha:
                     return beta, bestMove
             return beta, bestMove
-
-        # TODO: finish this function!
-        raise NotImplementedError
-
